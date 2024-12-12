@@ -6,3 +6,4 @@ engine = create_engine("postgresql://postgres:postgres@localhost/pizza-delivery"
 
 Base = declarative_base()
 Session = sessionmaker()
+session = Session(bind=engine)
