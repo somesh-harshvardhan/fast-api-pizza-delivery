@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_jwt_auth import AuthJWT
 from models import User, Order
-from schemas import OrderModel
+from schemas import OrderModel, OrderStatusModel
 from database import session
 from fastapi.encoders import jsonable_encoder
 
@@ -152,3 +152,54 @@ async def update_by_order_id(
     session.commit()
 
     return jsonable_encoder({"message": f"Updated order {order_id} successfully "})
+
+
+@order_router.put("/user/update/order/status/{order_id}")
+async def update_order_status(
+    order_id: int, orders: OrderStatusModel, Authorize: AuthJWT = Depends()
+):
+    try:
+        Authorize.jwt_required()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authorized"
+        )
+
+    username = Authorize.get_jwt_subject()
+
+    current_user = session.query(User).filter(User.username == username).first()
+
+    if current_user.is_staff:
+        order_to_update = session.query(Order).filter(Order.id == order_id).first()
+        setattr(order_to_update, "order_status", orders.order_status)
+        session.commit()
+        return jsonable_encoder(order_to_update)
+    else:
+        return HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Permission denied!"
+        )
+
+
+@order_router.delete("/order/{order_id}")
+async def delete(order_id: int, Authorize: AuthJWT = Depends()):
+    try:
+        Authorize.jwt_required()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authorized"
+        )
+
+    username = Authorize.get_jwt_subject()
+
+    curr_user = session.query(User).filter(User.username == username).first()
+
+    if curr_user.is_staff:
+        session.query(Order).filter(Order.id == order_id).delete()
+        session.commit()
+
+        return jsonable_encoder({"message": "Successfully deleted order record "})
+    else:
+        return HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authorized to perform this action",
+        )
